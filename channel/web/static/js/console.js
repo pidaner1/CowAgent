@@ -3404,6 +3404,7 @@ function initConfigView(data) {
     document.getElementById('cfg-max-tokens').value = data.agent_max_context_tokens || 50000;
     document.getElementById('cfg-max-turns').value = data.agent_max_context_turns || 20;
     document.getElementById('cfg-max-steps').value = data.agent_max_steps || 20;
+    document.getElementById('cfg-agent-timeout').value = data.agent_timeout || '';
     document.getElementById('cfg-enable-thinking').checked = data.enable_thinking === true;
 
     // Reflect the current UI language (already resolved, may include the user's
@@ -3659,6 +3660,7 @@ function saveAgentConfig() {
         agent_max_context_tokens: parseInt(document.getElementById('cfg-max-tokens').value) || 50000,
         agent_max_context_turns: parseInt(document.getElementById('cfg-max-turns').value) || 20,
         agent_max_steps: parseInt(document.getElementById('cfg-max-steps').value) || 20,
+        agent_timeout: parseInt(document.getElementById('cfg-agent-timeout').value) || null,
         enable_thinking: document.getElementById('cfg-enable-thinking').checked,
     };
 

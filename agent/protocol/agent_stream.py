@@ -99,6 +99,7 @@ class AgentStreamExecutor:
             messages: Optional[List[Dict]] = None,
             max_context_turns: int = 30,
             cancel_event=None,
+            agent_timeout: Optional[int] = None,
     ):
         """
         Initialize stream executor
@@ -116,6 +117,9 @@ class AgentStreamExecutor:
                 Checked at every safe point (turn boundary, before tool execution,
                 during LLM streaming). When set, raises AgentCancelledError which
                 run_stream catches to gracefully wind down.
+            agent_timeout: Optional maximum wall-clock seconds for a single
+                run_stream() call. When exceeded, the loop terminates gracefully
+                with a timeout message instead of hanging indefinitely.
         """
         self.agent = agent
         self.model = model
@@ -126,6 +130,11 @@ class AgentStreamExecutor:
         self.on_event = on_event
         self.max_context_turns = max_context_turns
         self.cancel_event = cancel_event
+        self.agent_timeout = agent_timeout
+
+        # Wall-clock timeout tracking (set at start of run_stream)
+        self._start_time = None
+        self._deadline = None
 
         # Message history - use provided messages or create new list
         self.messages = messages if messages is not None else []
@@ -144,6 +153,19 @@ class AgentStreamExecutor:
         """
         if self.cancel_event is not None and self.cancel_event.is_set():
             raise AgentCancelledError("agent cancelled by user")
+
+    def _check_timeout(self) -> None:
+        """Raise AgentCancelledError if the agent has exceeded its wall-clock timeout.
+
+        Checked alongside _check_cancelled at every safe point. This prevents
+        long-running tool calls (e.g. bash scripts with high timeout values)
+        from keeping the Planner loop alive indefinitely.
+        """
+        if self.agent_timeout and self._deadline and time.time() > self._deadline:
+            elapsed = time.time() - self._start_time
+            raise AgentCancelledError(
+                f"agent timed out after {elapsed:.0f}s (limit: {self.agent_timeout}s)"
+            )
 
     def _handle_cancelled(self, partial_response: str) -> None:
         """Wind down ``self.messages`` after a user-initiated cancel.
@@ -351,7 +373,13 @@ class AgentStreamExecutor:
         
         thinking_enabled = self._is_thinking_enabled()
         thinking_label = " | 💭 thinking" if thinking_enabled else ""
-        logger.info(f"🤖 {self.model.model}{thinking_label} | 👤 {user_message}")        
+        logger.info(f"🤖 {self.model.model}{thinking_label} | 👤 {user_message}")
+        
+        # Initialize wall-clock timeout tracking
+        self._start_time = time.time()
+        self._deadline = (self._start_time + self.agent_timeout) if self.agent_timeout else None
+        if self._deadline:
+            logger.info(f"⏱️ Agent timeout set: {self.agent_timeout}s, deadline at {self._deadline:.0f}")        
         
         # Add user message (Claude format - use content blocks for consistency)
         self.messages.append({
@@ -385,6 +413,7 @@ class AgentStreamExecutor:
                 # Check at the very top of every turn so a cancel arriving
                 # between turns short-circuits cleanly.
                 self._check_cancelled()
+                self._check_timeout()
 
                 turn += 1
                 logger.info(f"[Agent] Turn {turn}")
@@ -493,6 +522,7 @@ class AgentStreamExecutor:
                     for tool_call in tool_calls:
                         # Honour cancel between tool invocations within the same turn
                         self._check_cancelled()
+                        self._check_timeout()
                         result = self._execute_tool(tool_call)
                         tool_results.append(result)
                         
@@ -675,14 +705,30 @@ class AgentStreamExecutor:
                         self.messages.pop(prompt_insert_idx)
                         logger.debug("[Agent] Removed injected max-steps prompt from message history")
 
-        except AgentCancelledError:
-            # User-initiated stop: wind down message history cleanly so the
-            # next turn is unaffected; channels emit a "cancelled" UI event.
+        except AgentCancelledError as cancel_err:
+            # User-initiated stop or agent timeout: wind down message history
+            # cleanly so the next turn is unaffected.
             cancelled = True
-            logger.info(f"[Agent] 🛑 Cancelled by user (turn {turn})")
-            self._handle_cancelled(final_response)
-            if not final_response or not final_response.strip():
-                final_response = "_(Cancelled)_"
+            is_timeout = "timed out" in str(cancel_err)
+            if is_timeout:
+                logger.warning(f"[Agent] ⏱️ Agent timed out (turn {turn}): {cancel_err}")
+                self._handle_cancelled(final_response)
+                elapsed = time.time() - self._start_time if self._start_time else 0
+                if not final_response or not final_response.strip():
+                    final_response = _t(
+                        f"执行超时（已运行 {elapsed:.0f} 秒，超过 {self.agent_timeout} 秒限制）。任务可能还未完成，你可以继续发送消息让我接着做。",
+                        f"Execution timed out (ran for {elapsed:.0f}s, exceeding the {self.agent_timeout}s limit). The task may not be complete — you can send another message to continue.",
+                    )
+                self._emit_event("agent_timeout", {
+                    "elapsed": round(elapsed, 1),
+                    "limit": self.agent_timeout,
+                    "turn": turn,
+                })
+            else:
+                logger.info(f"[Agent] 🛑 Cancelled by user (turn {turn})")
+                self._handle_cancelled(final_response)
+                if not final_response or not final_response.strip():
+                    final_response = "_(Cancelled)_"
 
         except Exception as e:
             logger.error(f"❌ Agent execution error: {e}")
@@ -1171,6 +1217,9 @@ class AgentStreamExecutor:
             # Set tool context
             tool.model = self.model
             tool.context = self.agent
+            # Inject agent deadline so long-running tools (e.g. bash) can
+            # cap their own timeout to not outlive the agent loop.
+            tool._agent_deadline = self._deadline
 
             # Execute tool
             start_time = time.time()

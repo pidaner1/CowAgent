@@ -38,6 +38,12 @@ class BaseTool:
     description: str = "Base tool"
     params: dict = {}  # Store JSON Schema
     model: Optional[Any] = None  # LLM model instance, type depends on bot implementation
+    
+    # Agent-level deadline (epoch seconds). Set by AgentStreamExecutor before
+    # each tool invocation when agent_timeout is configured. Tools that perform
+    # long-running operations (e.g. bash) can use this to cap their own timeout
+    # so they don't outlive the agent loop.
+    _agent_deadline: Optional[float] = None
 
     @classmethod
     def get_json_schema(cls) -> dict:

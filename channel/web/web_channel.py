@@ -1542,7 +1542,7 @@ class ConfigHandler:
         "open_ai_api_key", "deepseek_api_key", "qianfan_api_key", "claude_api_key", "gemini_api_key",
         "zhipu_ai_api_key", "dashscope_api_key", "moonshot_api_key",
         "ark_api_key", "minimax_api_key", "linkai_api_key", "custom_api_key", "mimo_api_key",
-        "agent_max_context_tokens", "agent_max_context_turns", "agent_max_steps",
+        "agent_max_context_tokens", "agent_max_context_turns", "agent_max_steps", "agent_timeout",
         "enable_thinking", "web_password",
     }
 
@@ -1597,6 +1597,7 @@ class ConfigHandler:
                 "agent_max_context_tokens": local_config.get("agent_max_context_tokens", 50000),
                 "agent_max_context_turns": local_config.get("agent_max_context_turns", 20),
                 "agent_max_steps": local_config.get("agent_max_steps", 20),
+                "agent_timeout": local_config.get("agent_timeout", None),
                 "enable_thinking": bool(local_config.get("enable_thinking", False)),
                 "api_bases": api_bases,
                 "api_keys": api_keys_masked,
@@ -1623,6 +1624,8 @@ class ConfigHandler:
                     continue
                 if key in ("agent_max_context_tokens", "agent_max_context_turns", "agent_max_steps"):
                     value = int(value)
+                if key == "agent_timeout":
+                    value = int(value) if value else None
                 if key in ("use_linkai", "enable_thinking"):
                     value = bool(value)
                 local_config[key] = value

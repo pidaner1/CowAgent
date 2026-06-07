@@ -101,6 +101,7 @@ class AgentInitializer:
         from config import conf
         max_steps = conf().get("agent_max_steps", 20)
         max_context_tokens = conf().get("agent_max_context_tokens", 50000)
+        agent_timeout = conf().get("agent_timeout", None)
         
         # Create agent
         agent = self.agent_bridge.create_agent(
@@ -112,7 +113,8 @@ class AgentInitializer:
             skill_manager=skill_manager,
             enable_skills=True,
             max_context_tokens=max_context_tokens,
-            runtime_info=runtime_info  # Pass runtime_info for dynamic time updates
+            runtime_info=runtime_info,  # Pass runtime_info for dynamic time updates
+            agent_timeout=agent_timeout,
         )
         
         # Attach memory manager and share LLM model for summarization

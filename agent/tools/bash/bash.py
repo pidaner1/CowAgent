@@ -7,6 +7,7 @@ import re
 import sys
 import subprocess
 import tempfile
+import time
 from typing import Dict, Any
 
 from agent.tools.base_tool import BaseTool, ToolResult
@@ -68,6 +69,22 @@ SAFETY:
 
         if not command:
             return ToolResult.fail("Error: command parameter is required")
+
+        # Cap bash timeout to not exceed the agent's remaining wall-clock budget.
+        # This prevents a long-running subprocess from keeping the agent loop
+        # alive after the agent-level timeout has expired.
+        if self._agent_deadline is not None:
+            remaining = self._agent_deadline - time.time()
+            if remaining <= 0:
+                return ToolResult.fail(
+                    f"Error: Agent timeout has already expired. Cannot execute command."
+                )
+            if timeout > remaining:
+                logger.info(
+                    f"[Bash] Capping timeout {timeout}s → {remaining:.0f}s "
+                    f"(agent deadline in {remaining:.0f}s)"
+                )
+                timeout = remaining
 
         # Security check: Prevent accessing sensitive config files
         if "~/.cow/.env" in command or "~/.cow" in command:
