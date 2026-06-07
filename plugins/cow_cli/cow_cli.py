@@ -604,7 +604,7 @@ class CowCliPlugin(Plugin):
         "agent_max_context_tokens",
         "agent_max_context_turns",
         "agent_max_steps",
-        "agent_timeout",
+        "agent_run_timeout",
         "knowledge",
         "enable_thinking",
     }

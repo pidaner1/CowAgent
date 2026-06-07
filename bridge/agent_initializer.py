@@ -101,7 +101,7 @@ class AgentInitializer:
         from config import conf
         max_steps = conf().get("agent_max_steps", 20)
         max_context_tokens = conf().get("agent_max_context_tokens", 50000)
-        agent_timeout = conf().get("agent_timeout", None)
+        agent_timeout = conf().get("agent_run_timeout", None)
         
         # Create agent
         agent = self.agent_bridge.create_agent(

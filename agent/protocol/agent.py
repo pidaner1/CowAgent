@@ -15,7 +15,7 @@ class Agent:
                  tools=None, output_mode="print", max_steps=100, max_context_tokens=None, 
                  context_reserve_tokens=None, memory_manager=None, name: str = None,
                  workspace_dir: str = None, skill_manager=None, enable_skills: bool = True,
-                 runtime_info: dict = None, agent_timeout: int = None):
+                 runtime_info: dict = None, agent_run_timeout: int = None):
         """
         Initialize the Agent with system prompt, model, description.
 
@@ -34,8 +34,10 @@ class Agent:
         :param skill_manager: Optional SkillManager instance (will be created if None and enable_skills=True)
         :param enable_skills: Whether to enable skills support (default: True)
         :param runtime_info: Optional runtime info dict (with _get_current_time callable for dynamic time)
-        :param agent_timeout: Maximum wall-clock seconds for a single run_stream() call (default: None, no limit)
+        :param agent_run_timeout: Maximum wall-clock seconds for a single run_stream() call (default: None, no limit)
+                    Each user message triggers a new run_stream(); the timeout resets per call.
         """
+
         self.name = name or "Agent"
         self.system_prompt = system_prompt
         self.model: LLMModel = model  # Instance of LLMModel
@@ -53,7 +55,7 @@ class Agent:
         self.workspace_dir = workspace_dir  # Workspace directory
         self.enable_skills = enable_skills  # Skills enabled flag
         self.runtime_info = runtime_info  # Runtime info for dynamic time update
-        self.agent_timeout = agent_timeout  # Global wall-clock timeout in seconds
+        self.agent_run_timeout = agent_run_timeout  # Global wall-clock timeout per run_stream() call
         
         # Initialize skill manager
         self.skill_manager = None
@@ -440,7 +442,7 @@ class Agent:
             messages=messages_copy,  # Pass copied message history
             max_context_turns=max_context_turns,
             cancel_event=cancel_event,
-            agent_timeout=self.agent_timeout,
+            agent_timeout=self.agent_run_timeout,
         )
 
         # Execute

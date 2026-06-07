@@ -248,7 +248,7 @@ available_setting = {
     "agent_max_context_tokens": 50000,  # max context tokens in Agent mode
     "agent_max_context_turns": 20,  # max context memory turns in Agent mode
     "agent_max_steps": 20,  # max decision steps per run in Agent mode
-    "agent_timeout": None,  # max wall-clock seconds per run_stream() call; None means no limit
+    "agent_run_timeout": None,  # max wall-clock seconds per run_stream() call; None means no limit
     "enable_thinking": False,  # Enable deep-thinking mode for thinking-capable models
     "reasoning_effort": "high",  # Reasoning depth under thinking mode: "high" or "max"
     "knowledge": True,  # whether to enable the knowledge base feature

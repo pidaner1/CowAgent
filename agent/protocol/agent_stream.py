@@ -118,8 +118,10 @@ class AgentStreamExecutor:
                 during LLM streaming). When set, raises AgentCancelledError which
                 run_stream catches to gracefully wind down.
             agent_timeout: Optional maximum wall-clock seconds for a single
-                run_stream() call. When exceeded, the loop terminates gracefully
-                with a timeout message instead of hanging indefinitely.
+                run_stream() call (i.e. per user message). When exceeded, the
+                loop terminates gracefully with a timeout message. The timeout
+                resets for every new run_stream() invocation, so a long-lived
+                Agent that handles many messages over hours is not affected.
         """
         self.agent = agent
         self.model = model
