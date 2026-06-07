@@ -73,14 +73,17 @@ def _kill_pid(pid: int, force: bool = False):
 
 
 def _read_pid() -> Optional[int]:
+    # 获取PID文件路径
     pid_file = _get_pid_file()
     if not os.path.exists(pid_file):
         return None
     try:
         with open(pid_file, "r") as f:
             pid = int(f.read().strip())
+        # 检查进程是否存活
         if _is_pid_alive(pid):
             return pid
+        # 进程不存活，删除PID文件
         os.remove(pid_file)
         return None
     except (ValueError, OSError):
@@ -107,6 +110,7 @@ def _remove_pid():
 @click.option("--no-logs", is_flag=True, help="Don't tail logs after starting")
 def start(foreground, no_logs):
     """Start CowAgent."""
+    # 获取当前PID，如果存在且进程存活，则提示已运行
     pid = _read_pid()
     if pid:
         click.echo(f"CowAgent is already running (PID: {pid}).")

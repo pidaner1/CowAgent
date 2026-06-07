@@ -76,6 +76,7 @@ class ChannelManager:
                 self._primary_channel = channels[0][1]
 
             if first_start:
+                # 加载插件
                 PluginManager().load_plugins()
 
                 # Cloud client is optional. It is only started when
